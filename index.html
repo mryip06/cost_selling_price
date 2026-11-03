@@ -16,11 +16,12 @@
         <div class="bg-indigo-600 px-6 py-5 text-white flex justify-between items-center flex-wrap gap-3">
             <div>
                 <h1 class="text-xl font-bold">盈虧與百分率 算式練習機</h1>
-                <p class="text-xs text-indigo-100 mt-1">支援算式輸入：例如 1755/1.34 、 (848-530)/530 、 20% 、 0.2</p>
+                <p class="text-xs text-indigo-100 mt-1">支援算式輸入：1755/1.34、(848-530)/530、20%、0.2 (按 Enter 可提交/跳題)</p>
             </div>
-            <div class="bg-indigo-700/60 px-3 py-1.5 rounded-lg text-xs font-semibold flex gap-3">
-                <span>答對: <strong id="score-correct" class="text-green-300">0</strong></span>
-                <span>總答題: <strong id="score-total" class="text-amber-300">0</strong></span>
+            <div class="bg-indigo-700/60 px-3 py-1.5 rounded-lg text-xs font-semibold flex gap-2 items-center">
+                <span id="score-text" class="text-green-300 font-bold">答對 0/0</span>
+                <span class="text-indigo-200">|</span>
+                <span id="progress-text" class="text-indigo-100">第 1/1 題</span>
             </div>
         </div>
 
@@ -41,12 +42,13 @@
             <p id="q-text" class="text-lg font-medium leading-relaxed text-slate-800 mb-6">點擊下方按鈕開始產生題目...</p>
 
             <!-- Input Area -->
-            <form onsubmit="submitAnswer(event)" class="space-y-4">
+            <form onsubmit="handleFormSubmit(event)" class="space-y-4">
                 <div class="flex items-center gap-3">
                     <label for="user-input" class="font-bold text-slate-700 whitespace-nowrap">答案：</label>
                     <div class="relative flex-1">
-                        <input type="text" id="user-input" placeholder="可輸入數字或算式，如 1755/1.34 或 (848-530)/530" 
+                        <input type="text" id="user-input" placeholder="輸入數字或算式，如 1755/1.34" 
                                oninput="liveEvaluate()"
+                               onkeydown="handleKeyDown(event)"
                                class="w-full border-2 border-slate-300 rounded-xl px-4 py-2.5 text-slate-800 font-medium focus:border-indigo-500 focus:outline-none transition">
                     </div>
                     <button type="submit" id="btn-submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl transition shadow-md hover:shadow">
@@ -73,38 +75,43 @@
                 <div id="solution-text" class="space-y-1"></div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="mt-6 flex flex-wrap gap-3 pt-4 border-t border-slate-100">
-                <button onclick="toggleSolution()" id="btn-toggle-sol" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-lg transition">
+            <!-- Action Buttons (Navigation & History) -->
+            <div class="mt-6 flex items-center justify-between pt-4 border-t border-slate-100 flex-wrap gap-3">
+                <div class="flex gap-2">
+                    <button onclick="prevQuestion()" id="btn-prev" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                        ⬅️ 上一題
+                    </button>
+                    <button onclick="nextQuestion()" id="btn-next" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 py-2 rounded-lg transition">
+                        下一題 ➡️
+                    </button>
+                </div>
+
+                <button onclick="toggleSolution()" id="btn-toggle-sol" class="text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-4 py-2 rounded-lg transition ml-auto">
                     顯示解題步驟
-                </button>
-                <button onclick="generateQuestion()" class="text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg transition shadow ml-auto">
-                    下一題 ➔
                 </button>
             </div>
         </div>
 
         <!-- Help Info -->
         <div class="bg-amber-50 border-t border-amber-100 p-4 text-xs text-amber-800 leading-relaxed">
-            💡 <strong>算式與答案輸入規則說明：</strong>
+            💡 <strong>操作小提示：</strong>
             <ul class="list-disc ml-5 mt-1 space-y-0.5 text-amber-700">
-                <li>✅ <strong>金額題型</strong>：支援輸入四捨五入後的整數（如 <code>1310</code>）或精確算式（如 <code>1755/1.34</code>）。</li>
-                <li>✅ <strong>百分率題型</strong>：支援 <code>0.2</code>、<code>20%</code> 或算式 <code>(848-530)/530</code>。</li>
-                <li>❌ <strong>百分率注意事項</strong>：求百分率時若未填 <code>%</code>，整數 <code>20</code> 代表 $2000\%$。</li>
+                <li>在輸入框內按下 <strong>Enter 鍵</strong>：未答對時會自動<strong>核對答案</strong>；若已答對則會自動跳往<strong>下一題</strong>。</li>
+                <li>您隨時可以點擊「上一題」來複習您之前作答過的題目與算式紀錄。</li>
             </ul>
         </div>
     </div>
 
     <script>
-        let currentQuestion = null;
+        let questionsHistory = [];
+        let currentIndex = -1;
         let filterMode = 'all';
-        let totalCount = 0;
-        let correctCount = 0;
-        let firstTry = true;
+        let totalAttemptedSet = new Set(); // 記錄作答過的題目索引
+        let correctSet = new Set(); // 記錄答對的題目索引
 
         const items = ["模型玩具", "智慧手錶", "運動鞋", "手提包", "單眼相機", "藍牙耳機", "遊戲主機", "平板電腦", "自行車", "鍵盤"];
 
-        // 解析數學算式 (支援 %, 隱式乘法)
+        // 數學算式解析器
         function parseMathExpression(expr) {
             if (!expr || typeof expr !== 'string') return NaN;
             let cleaned = expr.replace(/\s+/g, '').replace(/%/g, '/100');
@@ -125,27 +132,27 @@
                 btn.className = 'filter-btn px-3 py-1 rounded-full font-medium transition bg-white text-slate-600 hover:bg-slate-200';
             });
             document.getElementById(`btn-${mode}`).className = 'filter-btn px-3 py-1 rounded-full font-medium transition bg-indigo-600 text-white';
-            generateQuestion();
+            
+            // 切換題型時重置或直接生新題
+            questionsHistory = [];
+            currentIndex = -1;
+            totalAttemptedSet.clear();
+            correctSet.clear();
+            addNewQuestion();
+            renderCurrentQuestion();
         }
 
         function getRandomInt(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
         }
 
-        function generateQuestion() {
-            firstTry = true;
-            document.getElementById('user-input').value = '';
-            document.getElementById('feedback-box').className = 'mt-4 hidden p-4 rounded-xl border';
-            document.getElementById('solution-box').classList.add('hidden');
-            document.getElementById('btn-toggle-sol').innerText = '顯示解題步驟';
-            document.getElementById('live-eval-box').classList.add('hidden');
-
+        function addNewQuestion() {
             let types = ['sp', 'cp', 'rate'];
             let type = filterMode === 'all' ? types[getRandomInt(0, 2)] : filterMode;
 
             const item = items[getRandomInt(0, items.length - 1)];
-            const isProfit = Math.random() > 0.3; // 70% 概率為利潤
-            const ratePercent = getRandomInt(5, 45); // 5% ~ 45%
+            const isProfit = Math.random() > 0.3;
+            const ratePercent = getRandomInt(5, 45);
             const rateDecimal = ratePercent / 100;
 
             let cp, sp, targetDecimalRatio, targetUnit, questionText, tagText, steps = [];
@@ -153,7 +160,7 @@
             if (type === 'sp') {
                 cp = getRandomInt(10, 200) * 10;
                 sp = isProfit ? Math.round(cp * (1 + rateDecimal)) : Math.round(cp * (1 - rateDecimal));
-                targetDecimalRatio = sp; // 售價金額
+                targetDecimalRatio = sp;
                 targetUnit = '元';
                 tagText = '求售價 (Selling Price)';
                 
@@ -163,26 +170,24 @@
                 
                 steps.push(`1. 識別已知條件：成本 = $${cp}，${isProfit ? '利潤率' : '虧損率'} = ${rateStr}`);
                 steps.push(`2. 套用公式：售價 = 成本 × (1 ${isProfit ? '+' : '-'} ${isProfit ? '利潤率' : '虧損率'})`);
-                steps.push(`3. 計算過程：$${cp} × (1 ${isProfit ? '+' : '-'} ${rateDecimal}) = $${cp} × ${isProfit ? (1 + rateDecimal).toFixed(2) : (1 - rateDecimal).toFixed(2)} = $${sp}`);
+                steps.push(`3. 計算過程：$${cp} × (1 ${isProfit ? '+' : '-'} ${rateDecimal}) = $${sp}`);
 
             } else if (type === 'cp') {
                 let baseCp = getRandomInt(10, 150) * 10;
                 sp = isProfit ? Math.round(baseCp * (1 + rateDecimal)) : Math.round(baseCp * (1 - rateDecimal));
                 
-                // 保存精確的成本目標值（例如 1755 / 1.34 = 1309.70149...）
                 targetDecimalRatio = isProfit ? sp / (1 + rateDecimal) : sp / (1 - rateDecimal);
-                cp = Math.round(targetDecimalRatio); // 顯示與說明的整數
-                
+                cp = Math.round(targetDecimalRatio);
                 targetUnit = '元';
                 tagText = '求成本 (Cost Price)';
                 
                 const rateStr = `${ratePercent}%`;
                 const actionStr = isProfit ? `賺取了 ${rateStr} 的利潤` : `遭受了 ${rateStr} 的虧損`;
-                questionText = `某商戶以 $${sp} 售出一件${item}，從中${actionStr}。求該${item}的成本（取至最接近的整數或輸入算式）。`;
+                questionText = `某商戶以 $${sp} 售出一件${item}，從中${actionStr}。求該${item}的成本。`;
                 
                 steps.push(`1. 識別已知條件：售價 = $${sp}，${isProfit ? '利潤率' : '虧損率'} = ${rateStr}`);
                 steps.push(`2. 套用公式：成本 = 售價 ÷ (1 ${isProfit ? '+' : '-'} ${isProfit ? '利潤率' : '虧損率'})`);
-                steps.push(`3. 計算過程：$${sp} ÷ (1 ${isProfit ? '+' : '-'} ${rateDecimal}) = $${sp} ÷ ${isProfit ? (1 + rateDecimal).toFixed(2) : (1 - rateDecimal).toFixed(2)} ≈ $${cp} (精確值約 ${targetDecimalRatio.toFixed(2)})`);
+                steps.push(`3. 計算過程：$${sp} ÷ (1 ${isProfit ? '+' : '-'} ${rateDecimal}) ≈ $${cp} (精確值約 ${targetDecimalRatio.toFixed(2)})`);
 
             } else { // rate
                 cp = getRandomInt(10, 100) * 10;
@@ -190,8 +195,6 @@
                 if (!isProfit && diff >= cp) diff = Math.floor(cp * 0.4);
                 
                 sp = isProfit ? cp + diff : cp - diff;
-                
-                // 標準答案數值為小數比率 (例如 20% = 0.2)
                 targetDecimalRatio = Math.abs(sp - cp) / cp;
                 targetUnit = '';
                 tagText = isProfit ? '求利潤率' : '求虧損率';
@@ -199,15 +202,83 @@
                 questionText = `某商戶購入一件${item}，成本為 $${cp}，最終以 $${sp} 售出。求${isProfit ? '利潤率' : '虧損率'}。`;
                 
                 const rateDisplay = (targetDecimalRatio * 100).toFixed(2).replace(/\.00$/, '');
-                steps.push(`1. 計算${isProfit ? '利潤' : '虧損'}金額：|售價 - 成本| = |$${sp} - $${cp}| = $${Math.abs(sp - cp)}`);
-                steps.push(`2. 套用公式：${isProfit ? '利潤率' : '虧損率'} = (${isProfit ? '利潤' : '虧損'} ÷ 成本)`);
-                steps.push(`3. 計算過程：$${Math.abs(sp - cp)} ÷ $${cp} = ${targetDecimalRatio.toFixed(4)} = ${rateDisplay}%（或 ${targetDecimalRatio}）`);
+                steps.push(`1. 計算金額差：|售價 - 成本| = |$${sp} - $${cp}| = $${Math.abs(sp - cp)}`);
+                steps.push(`2. 套用公式：${isProfit ? '利潤率' : '虧損率'} = (金額差 ÷ 成本)`);
+                steps.push(`3. 計算過程：$${Math.abs(sp - cp)} ÷ $${cp} = ${targetDecimalRatio.toFixed(4)} (${rateDisplay}%)`);
             }
 
-            currentQuestion = { type, cp, sp, isProfit, targetDecimalRatio, targetUnit, questionText, tagText, steps };
+            const newQ = {
+                type, cp, sp, isProfit, targetDecimalRatio, targetUnit, questionText, tagText, steps,
+                userInputValue: '',
+                isSolved: false,
+                feedbackHtml: '',
+                feedbackClass: 'mt-4 hidden p-4 rounded-xl border',
+                showSolution: false
+            };
 
-            document.getElementById('q-tag').innerText = tagText;
-            document.getElementById('q-text').innerText = questionText;
+            questionsHistory.push(newQ);
+            currentIndex = questionsHistory.length - 1;
+        }
+
+        function renderCurrentQuestion() {
+            if (currentIndex < 0 || currentIndex >= questionsHistory.length) return;
+            const q = questionsHistory[currentIndex];
+
+            document.getElementById('q-tag').innerText = q.tagText;
+            document.getElementById('q-text').innerText = q.questionText;
+            document.getElementById('user-input').value = q.userInputValue;
+            
+            // Feedback
+            const fb = document.getElementById('feedback-box');
+            fb.className = q.feedbackClass;
+            fb.innerHTML = q.feedbackHtml;
+            if (!q.feedbackHtml) fb.classList.add('hidden');
+            else fb.classList.remove('hidden');
+
+            // Solution
+            const solBox = document.getElementById('solution-box');
+            const solText = document.getElementById('solution-text');
+            const btnSol = document.getElementById('btn-toggle-sol');
+            if (q.showSolution) {
+                solText.innerHTML = q.steps.map(step => `<p>${step}</p>`).join('');
+                solBox.classList.remove('hidden');
+                btnSol.innerText = '隱藏解題步驟';
+            } else {
+                solBox.classList.add('hidden');
+                btnSol.innerText = '顯示解題步驟';
+            }
+
+            // Navigation buttons state
+            document.getElementById('btn-prev').disabled = currentIndex === 0;
+
+            // Progress & Score
+            document.getElementById('progress-text').innerText = `第 ${currentIndex + 1}/${questionsHistory.length} 題`;
+            updateScoreDisplay();
+
+            // Clear live eval
+            document.getElementById('live-eval-box').classList.add('hidden');
+        }
+
+        function updateScoreDisplay() {
+            const correctCount = correctSet.size;
+            const attemptedCount = totalAttemptedSet.size;
+            document.getElementById('score-text').innerText = `答對 ${correctCount}/${attemptedCount}`;
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderCurrentQuestion();
+            }
+        }
+
+        function nextQuestion() {
+            if (currentIndex === questionsHistory.length - 1) {
+                addNewQuestion();
+            } else {
+                currentIndex++;
+            }
+            renderCurrentQuestion();
         }
 
         function liveEvaluate() {
@@ -233,7 +304,8 @@
                 evalValSpan.innerText = rounded;
                 evalValSpan.className = 'text-indigo-600 text-sm font-bold';
                 
-                if (currentQuestion && currentQuestion.type === 'rate') {
+                const q = questionsHistory[currentIndex];
+                if (q && q.type === 'rate') {
                     evalPercentSpan.innerText = `(= ${(rounded * 100).toFixed(2).replace(/\.00$/, '')}%)`;
                 } else {
                     evalPercentSpan.innerText = '';
@@ -241,93 +313,103 @@
             }
         }
 
-        function submitAnswer(e) {
+        function handleKeyDown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const q = questionsHistory[currentIndex];
+                if (q.isSolved) {
+                    nextQuestion();
+                } else {
+                    submitAnswer();
+                }
+            }
+        }
+
+        function handleFormSubmit(e) {
             e.preventDefault();
+            submitAnswer();
+        }
+
+        function submitAnswer() {
             const rawInput = document.getElementById('user-input').value.trim();
-            const feedback = document.getElementById('feedback-box');
+            const q = questionsHistory[currentIndex];
+            q.userInputValue = rawInput;
 
             if (!rawInput) return;
 
             let userVal = parseMathExpression(rawInput);
+            const feedback = document.getElementById('feedback-box');
+
             if (isNaN(userVal)) {
-                feedback.className = 'mt-4 p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-800 text-sm';
-                feedback.innerHTML = '⚠️ 請輸入有效的數字或算式（例如：<code>0.2</code>、<code>20%</code>、<code>1755/1.34</code>）。';
-                feedback.classList.remove('hidden');
+                q.feedbackClass = 'mt-4 p-4 rounded-xl border bg-amber-50 border-amber-200 text-amber-800 text-sm';
+                q.feedbackHtml = '⚠️ 請輸入有效的數字或算式（例如：<code>0.2</code>、<code>20%</code>、<code>1755/1.34</code>）。';
+                renderCurrentQuestion();
                 return;
             }
 
-            const target = currentQuestion.targetDecimalRatio;
+            const target = q.targetDecimalRatio;
             let isCorrect = false;
 
-            if (currentQuestion.type === 'rate') {
-                // 利潤率 / 虧損率 判定
+            if (q.type === 'rate') {
                 isCorrect = Math.abs(userVal - target) < 0.001;
             } else {
-                // 金額（售價/成本）判定：
-                // 1. 允許與精確算式結果比對 (例如 1755/1.34 = 1309.7015)
-                // 2. 允許與四捨五入後的整數比對 (例如 1310)
                 const roundedTarget = Math.round(target);
                 isCorrect = (Math.abs(userVal - target) < 0.5) || (Math.abs(userVal - roundedTarget) < 0.5);
             }
 
-            if (firstTry) {
-                totalCount++;
-                if (isCorrect) correctCount++;
-                document.getElementById('score-correct').innerText = correctCount;
-                document.getElementById('score-total').innerText = totalCount;
-                firstTry = false;
+            totalAttemptedSet.add(currentIndex);
+            if (isCorrect) {
+                correctSet.add(currentIndex);
+                q.isSolved = true;
             }
 
-            feedback.classList.remove('hidden');
+            updateScoreDisplay();
 
             if (isCorrect) {
-                const displayVal = currentQuestion.type === 'rate' 
+                const displayVal = q.type === 'rate' 
                     ? `${userVal} (${(userVal * 100).toFixed(2).replace(/\.00$/, '')}%)` 
                     : `${userVal.toFixed(2).replace(/\.00$/, '')} 元`;
 
-                feedback.className = 'mt-4 p-4 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-800 text-sm font-medium flex items-center gap-2';
-                feedback.innerHTML = `
+                q.feedbackClass = 'mt-4 p-4 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-800 text-sm font-medium flex items-center gap-2';
+                q.feedbackHtml = `
                     <svg class="w-6 h-6 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <div>
-                        <div>恭喜你，回答完全正確！🎉</div>
+                        <div>恭喜你，回答完全正確！🎉 (按 Enter 鍵可直接跳至下一題)</div>
                         <div class="text-xs text-emerald-600 font-normal mt-0.5">您的輸入求值結果：${displayVal}</div>
                     </div>
                 `;
             } else {
                 let errorTip = '';
-                if (currentQuestion.type === 'rate' && Math.abs(userVal - (target * 100)) < 0.1) {
+                if (q.type === 'rate' && Math.abs(userVal - (target * 100)) < 0.1) {
                     errorTip = `<br>💡 提示：若輸入整數 <strong>${userVal}</strong>，代表 ${userVal * 100}%。請輸入 <strong>${userVal}%</strong> 或 <strong>${(userVal/100).toFixed(2)}</strong>。`;
                 }
 
-                feedback.className = 'mt-4 p-4 rounded-xl border bg-rose-50 border-rose-200 text-rose-800 text-sm';
-                feedback.innerHTML = `
+                q.feedbackClass = 'mt-4 p-4 rounded-xl border bg-rose-50 border-rose-200 text-rose-800 text-sm';
+                q.feedbackHtml = `
                     <div class="font-bold flex items-center gap-1.5 text-rose-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        答案不對喔！請修改後重新提交。
+                        答案不對喔！請修改後重新提交（可再次按 Enter）。
                     </div>
                     <div class="text-xs text-rose-600 mt-1">
                         您的算式算出的數值為：<strong>${userVal.toFixed(4).replace(/\.?0+$/, '')}</strong>${errorTip}
                     </div>
                 `;
             }
+
+            renderCurrentQuestion();
         }
 
         function toggleSolution() {
-            const solBox = document.getElementById('solution-box');
-            const btn = document.getElementById('btn-toggle-sol');
-            const solText = document.getElementById('solution-text');
-
-            if (solBox.classList.contains('hidden')) {
-                solText.innerHTML = currentQuestion.steps.map(step => `<p>${step}</p>`).join('');
-                solBox.classList.remove('hidden');
-                btn.innerText = '隱藏解題步驟';
-            } else {
-                solBox.classList.add('hidden');
-                btn.innerText = '顯示解題步驟';
-            }
+            const q = questionsHistory[currentIndex];
+            q.showSolution = !q.showSolution;
+            renderCurrentQuestion();
         }
 
-        window.onload = generateQuestion;
+        // 初始化載入第一題
+        window.onload = function() {
+            addNewQuestion();
+            renderCurrentQuestion();
+        };
     </script>
 </body>
 </html>
