@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商業數學練習：售價、成本與盈虧率</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font & Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Inter', sans-serif;
+        }
+        /* Custom styled animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-calculator text-2xl text-indigo-200"></i>
+                <h1 class="text-xl font-bold tracking-wide">商業數學練習：售價、成本與盈虧</h1>
+            </div>
+            <!-- Statistics Badge -->
+            <div class="flex items-center gap-4 bg-indigo-700/60 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-medium border border-indigo-400/30">
+                <span>答對: <strong id="score-correct" class="text-emerald-300">0</strong></span>
+                <span class="text-indigo-300">|</span>
+                <span>總答題: <strong id="score-total" class="text-white">0</strong></span>
+                <span class="text-indigo-300">|</span>
+                <span>正確率: <strong id="score-accuracy" class="text-amber-300">0%</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-3xl mx-auto w-full px-4 py-6 flex-grow flex flex-col justify-start">
+        
+        <!-- Controls & Filter Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-2">
+                <label for="question-type-select" class="text-sm font-medium text-slate-600">題目類型：</label>
+                <select id="question-type-select" class="bg-slate-100 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block p-2">
+                    <option value="all">隨機混合（全部類型）</option>
+                    <option value="find_sp">求售價 (Selling Price)</option>
+                    <option value="find_cp">求成本 (Cost Price)</option>
+                    <option value="find_rate">求利潤率 / 虧損率 (%)</option>
+                </select>
+            </div>
+            <button id="btn-reset-score" class="text-xs text-slate-500 hover:text-rose-600 transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate-right"></i> 重置統計
+            </button>
+        </div>
+
+        <!-- Question Card -->
+        <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden transition-all duration-300">
+            <!-- Card Header -->
+            <div class="bg-slate-100 border-b border-slate-200 px-6 py-3 flex justify-between items-center">
+                <span id="question-tag" class="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-700 font-semibold text-xs px-3 py-1 rounded-full border border-indigo-200">
+                    <i class="fa-solid fa-circle-question"></i> 求售價
+                </span>
+                <span class="text-xs text-slate-400 font-mono">無限題庫模式</span>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-6">
+                <!-- Question Narrative Text -->
+                <div class="mb-6">
+                    <h2 id="question-text" class="text-lg sm:text-xl font-medium text-slate-800 leading-relaxed min-h-[60px]">
+                        <!-- Question content injected dynamically -->
+                    </h2>
+                </div>
+
+                <!-- Input Answer Section -->
+                <form id="answer-form" class="space-y-4" onsubmit="return false;">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <label for="user-answer" class="text-sm font-semibold text-slate-700 shrink-0">
+                            答案：
+                        </label>
+                        <div class="relative flex-grow">
+                            <input type="number" id="user-answer" step="any" placeholder="請輸入數值" required
+                                class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-lg rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-3 pr-12 transition">
+                            <span id="unit-label" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+                                元
+                            </span>
+                        </div>
+                        <button type="submit" id="btn-submit"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl px-6 py-3 shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-check"></i> 核對答案
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Feedback Alert Box -->
+                <div id="feedback-box" class="hidden mt-6 p-4 rounded-xl fade-in"></div>
+
+                <!-- Step-by-Step Solution Breakdown -->
+                <div id="solution-box" class="hidden mt-6 p-5 bg-amber-50/80 border border-amber-200 rounded-xl fade-in text-amber-900">
+                    <h3 class="font-bold text-base border-b border-amber-200/80 pb-2 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-lightbulb text-amber-600"></i> 計算步驟詳解：
+                    </h3>
+                    <div id="solution-steps" class="space-y-2 text-sm leading-relaxed">
+                        <!-- Solution detail injected dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Footer Controls -->
+            <div class="bg-slate-50 border-t border-slate-100 px-6 py-4 flex flex-wrap justify-between items-center gap-3">
+                <button id="btn-show-solution" type="button" class="text-slate-600 hover:text-indigo-600 text-sm font-medium flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-eye"></i> 顯示解題步驟
+                </button>
+                <button id="btn-next-question" type="button"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl px-5 py-2.5 shadow transition flex items-center gap-2">
+                    <span>下一題</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Formulas Quick Reference Accordion -->
+        <div class="mt-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+            <h3 class="text-md font-bold text-slate-800 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-book-bookmark text-indigo-500"></i> 常用商業數學公式參考
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs sm:text-sm text-slate-600">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p class="font-semibold text-indigo-900 mb-1">求售價 (SP)</p>
+                    <p class="font-mono text-slate-700">售價 = 成本 × (1 + 利潤率)</p>
+                    <p class="font-mono text-slate-700">售價 = 成本 × (1 - 虧損率)</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p class="font-semibold text-indigo-900 mb-1">求成本 (CP)</p>
+                    <p class="font-mono text-slate-700">成本 = 售價 ÷ (1 + 利潤率)</p>
+                    <p class="font-mono text-slate-700">成本 = 售價 ÷ (1 - 虧損率)</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p class="font-semibold text-indigo-900 mb-1">求盈虧百分比 (%)</p>
+                    <p class="font-mono text-slate-700">盈虧率 = [(售價 - 成本) ÷ 成本] × 100%</p>
+                    <p class="text-slate-400 text-xs mt-1">(結果為正為利潤率，負則為虧損率)</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-xs text-slate-400 border-t border-slate-200 mt-6 bg-white">
+        無限商業數學練習工具 &copy; 繁體中文互動教學版
+    </footer>
+
+    <!-- Application Script Logic -->
+    <script>
+        // State variables
+        let currentQuestion = null;
+        let score = { correct: 0, total: 0 };
+        let answerChecked = false;
+
+        // Sample Items for Realistic Story Problems
+        const items = ['手提電話', '手錶', '運動鞋', '手提電腦', '數碼相機', '背包', '耳機', '模型玩具', '遊戲機', '平板電腦'];
+
+        // Helper: Random Integer generator
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // Helper: Clean Rounding (up to 1 decimal place if needed, avoids floating point inaccuracy)
+        function roundClean(num, decimals = 1) {
+            const factor = Math.pow(10, decimals);
+            return Math.round((num + Number.EPSILON) * factor) / factor;
+        }
+
+        /**
+         * Question Generator Engine
+         */
+        function generateQuestion() {
+            const selectedType = document.getElementById('question-type-select').value;
+            let type = selectedType;
+
+            if (selectedType === 'all') {
+                const types = ['find_sp', 'find_cp', 'find_rate'];
+                type = types[Math.floor(Math.random() * types.length)];
+            }
+
+            const item = items[Math.floor(Math.random() * items.length)];
+            const isProfit = Math.random() > 0.3; // 70% chance profit, 30% loss
+            
+            let cp, sp, rate, questionText, unit, targetAnswer, steps, tagText;
+
+            // Scenario 1: Calculate Selling Price (Given Cost Price & Profit/Loss Rate)
+            if (type === 'find_sp') {
+                tagText = '求售價 (Selling Price)';
+                unit = '元';
+                cp = getRandomInt(10, 100) * 10; // e.g. $100 to $1000
+                rate = getRandomInt(1, 10) * 5; // e.g. 5%, 10%, 15%... 50%
+                
+                if (isProfit) {
+                    sp = cp * (1 + rate / 100);
+                    targetAnswer = roundClean(sp);
+                    questionText = `商人在商店中購入一個${item}，成本為 <strong>$${cp}</strong>。若以 <strong>${rate}% 的利潤率</strong> 售出，求該${item}的售價。`;
+                    steps = [
+                        `根據售價公式：售價 = 成本 × (1 + 利潤率)`,
+                        `售價 = ${cp} × (1 + ${rate}%)`,
+                        `售價 = ${cp} × (1 + ${rate / 100})`,
+                        `售價 = ${cp} × ${1 + rate / 100} = <strong>$${targetAnswer}</strong>`
+                    ];
+                } else {
+                    sp = cp * (1 - rate / 100);
+                    targetAnswer = roundClean(sp);
+                    questionText = `文具店老闆購入一批${item}，成本為 <strong>$${cp}</strong>。因特別促銷以 <strong>${rate}% 的虧損率</strong> 售出，求該${item}的售價。`;
+                    steps = [
+                        `根據售價公式：售價 = 成本 × (1 - 虧損率)`,
+                        `售價 = ${cp} × (1 - ${rate}%)`,
+                        `售價 = ${cp} × (1 - ${rate / 100})`,
+                        `售價 = ${cp} × ${1 - rate / 100} = <strong>$${targetAnswer}</strong>`
+                    ];
+                }
+            }
+            
+            // Scenario 2: Calculate Cost Price (Given Selling Price & Profit/Loss Rate)
+            else if (type === 'find_cp') {
+                tagText = '求成本 (Cost Price)';
+                unit = '元';
+                targetAnswer = getRandomInt(10, 100) * 10; // Expected clean Cost Price
+                rate = getRandomInt(1, 10) * 5; // Rate %
+                cp = targetAnswer;
+
+                if (isProfit) {
+                    sp = cp * (1 + rate / 100);
+                    sp = roundClean(sp);
+                    questionText = `商店以 <strong>$${sp}</strong> 售出一件${item}，獲取了 <strong>${rate}% 的利潤率</strong>。求該${item}的成本。`;
+                    steps = [
+                        `根據成本公式：成本 = 售價 ÷ (1 + 利潤率)`,
+                        `成本 = ${sp} ÷ (1 + ${rate}%)`,
+                        `成本 = ${sp} ÷ ${1 + rate / 100}`,
+                        `成本 = <strong>$${cp}</strong>`
+                    ];
+                } else {
+                    sp = cp * (1 - rate / 100);
+                    sp = roundClean(sp);
+                    questionText = `店主清貨減價，以 <strong>$${sp}</strong> 售出一件${item}，虧損率為 <strong>${rate}%</strong>。求該${item}的成本。`;
+                    steps = [
+                        `根據成本公式：成本 = 售價 ÷ (1 - 虧損率)`,
+                        `成本 = ${sp} ÷ (1 - ${rate}%)`,
+                        `成本 = ${sp} ÷ ${1 - rate / 100}`,
+                        `成本 = <strong>$${cp}</strong>`
+                    ];
+                }
+            }
+
+            // Scenario 3: Calculate Profit/Loss Percentage (Given Selling Price & Cost Price)
+            else if (type === 'find_rate') {
+                tagText = '求盈虧百分率 (%)';
+                unit = '%';
+                cp = getRandomInt(10, 80) * 10;
+                
+                // Pick a clean percentage (e.g. -40% to +60%)
+                const rateInt = getRandomInt(-6, 12) * 5; 
+                // Ensure rate is not zero
+                const cleanRate = rateInt === 0 ? 15 : rateInt;
+                
+                sp = cp * (1 + cleanRate / 100);
+                sp = roundClean(sp);
+                targetAnswer = cleanRate; // Positive means profit %, negative means loss %
+
+                if (cleanRate > 0) {
+                    questionText = `某商戶購入一件${item}，成本為 <strong>$${cp}</strong>，最終以 <strong>$${sp}</strong> 售出。求其 <strong>利潤率</strong>（以 % 表示）。`;
+                    steps = [
+                        `首先計算利潤金額：利潤 = 售價 - 成本 = $${sp} - $${cp} = $${roundClean(sp - cp)}`,
+                        `根據利潤率公式：利潤率 = (利潤 ÷ 成本) × 100%`,
+                        `利潤率 = (${roundClean(sp - cp)} ÷ ${cp}) × 100%`,
+                        `利潤率 = ${roundClean((sp - cp) / cp, 4)} × 100% = <strong>${targetAnswer}%</strong>`
+                    ];
+                } else {
+                    const positiveLoss = Math.abs(cleanRate);
+                    questionText = `某商戶購入一件${item}，成本為 <strong>$${cp}</strong>，最終以 <strong>$${sp}</strong> 賤賣。求其 <strong>虧損率</strong>（以 % 表示）。`;
+                    steps = [
+                        `首先計算虧損金額：虧損 = 成本 - 售價 = $${cp} - $${sp} = $${roundClean(cp - sp)}`,
+                        `根據虧損率公式：虧損率 = (虧損 ÷ 成本) × 100%`,
+                        `虧損率 = (${roundClean(cp - sp)} ÷ ${cp}) × 100%`,
+                        `虧損率 = <strong>${positiveLoss}%</strong> (若填寫 -${positiveLoss} 或 ${positiveLoss} 均可)`
+                    ];
+                    // Allow positive value for loss rate input as well
+                    targetAnswer = positiveLoss; 
+                }
+            }
+
+            return {
+                type,
+                tagText,
+                questionText,
+                unit,
+                targetAnswer,
+                steps,
+                isProfit,
+                rawTarget: cleanRateOrDefault(targetAnswer)
+            };
+        }
+
+        function cleanRateOrDefault(val) {
+            return typeof val === 'number' ? val : 0;
+        }
+
+        // Render current question to screen
+        function displayQuestion() {
+            currentQuestion = generateQuestion();
+            answerChecked = false;
+
+            document.getElementById('question-tag').innerHTML = `<i class="fa-solid fa-circle-question"></i> ${currentQuestion.tagText}`;
+            document.getElementById('question-text').innerHTML = currentQuestion.questionText;
+            document.getElementById('unit-label').innerText = currentQuestion.unit;
+            
+            // Clear inputs & dynamic sections
+            document.getElementById('user-answer').value = '';
+            document.getElementById('user-answer').disabled = false;
+            document.getElementById('btn-submit').disabled = false;
+            
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.add('hidden');
+            feedbackBox.className = 'hidden mt-6 p-4 rounded-xl fade-in';
+            
+            const solutionBox = document.getElementById('solution-box');
+            solutionBox.classList.add('hidden');
+            
+            // Populate solution steps
+            const stepsContainer = document.getElementById('solution-steps');
+            stepsContainer.innerHTML = currentQuestion.steps.map((step, idx) => `
+                <div class="flex items-start gap-2">
+                    <span class="bg-amber-200 text-amber-900 font-bold rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">${idx + 1}</span>
+                    <div>${step}</div>
+                </div>
+            `).join('');
+
+            // Auto focus answer input
+            document.getElementById('user-answer').focus();
+        }
+
+        // Validate Answer
+        function checkAnswer() {
+            if (answerChecked) return;
+
+            const inputEl = document.getElementById('user-answer');
+            const userValStr = inputEl.value.trim();
+
+            if (userValStr === '') return;
+
+            const userVal = parseFloat(userValStr);
+            const expected = currentQuestion.targetAnswer;
+            
+            // Allow small rounding tolerance (±0.1)
+            let isCorrect = Math.abs(userVal - expected) < 0.15;
+
+            // Edge case: For loss rate, accept both positive or negative value (e.g. 20 or -20)
+            if (!isCorrect && currentQuestion.type === 'find_rate' && !currentQuestion.isProfit) {
+                if (Math.abs(Math.abs(userVal) - Math.abs(expected)) < 0.15) {
+                    isCorrect = true;
+                }
+            }
+
+            answerChecked = true;
+            score.total++;
+
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.remove('hidden');
+
+            if (isCorrect) {
+                score.correct++;
+                feedbackBox.className = 'mt-6 p-4 rounded-xl fade-in bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3';
+                feedbackBox.innerHTML = `
+                    <i class="fa-solid fa-circle-check text-2xl text-emerald-600"></i>
+                    <div>
+                        <p class="font-bold">回答正確！太棒了！</p>
+                        <p class="text-xs text-emerald-700">答案確實為 ${expected} ${currentQuestion.unit}。</p>
+                    </div>
+                `;
+            } else {
+                feedbackBox.className = 'mt-6 p-4 rounded-xl fade-in bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-3';
+                feedbackBox.innerHTML = `
+                    <i class="fa-solid fa-circle-xmark text-2xl text-rose-600"></i>
+                    <div>
+                        <p class="font-bold">答案不太對喔！</p>
+                        <p class="text-xs text-rose-700">正確答案應為 <strong>${expected} ${currentQuestion.unit}</strong>。可以點擊下方「顯示解題步驟」查看詳解。</p>
+                    </div>
+                `;
+            }
+
+            updateScoreboard();
+        }
+
+        // Update Score UI
+        function updateScoreboard() {
+            document.getElementById('score-correct').innerText = score.correct;
+            document.getElementById('score-total').innerText = score.total;
+            const accuracy = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
+            document.getElementById('score-accuracy').innerText = `${accuracy}%`;
+        }
+
+        // Event Listeners setup
+        window.addEventListener('DOMContentLoaded', () => {
+            displayQuestion();
+
+            // Form Submit (Check Answer)
+            document.getElementById('answer-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                checkAnswer();
+            });
+
+            // Next Question Button
+            document.getElementById('btn-next-question').addEventListener('click', () => {
+                displayQuestion();
+            });
+
+            // Show Solution Toggle Button
+            document.getElementById('btn-show-solution').addEventListener('click', () => {
+                const solutionBox = document.getElementById('solution-box');
+                solutionBox.classList.toggle('hidden');
+            });
+
+            // Reset Score Button
+            document.getElementById('btn-reset-score').addEventListener('click', () => {
+                score = { correct: 0, total: 0 };
+                updateScoreboard();
+            });
+
+            // Changing filter auto generates new question
+            document.getElementById('question-type-select').addEventListener('change', () => {
+                displayQuestion();
+            });
+        });
+    </script>
+</body>
+</html>
